@@ -1,5 +1,5 @@
 VERSION 0.7
-PROJECT applied-knowledge-systems/terraphim-cloud-dependencies
+PROJECT terraphim/terraphim-cloud-dependencies
 FROM ubuntu:20.04
 ARG TARGETARCH
 ARG TARGETOS
