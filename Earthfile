@@ -81,5 +81,5 @@ redismod:
     COPY ./conf/redis_with_mods.conf /etc/redis/redis.conf
     COPY ./conf/redis.service /etc/systemd/system/redis.service
     WORKDIR /cluster
-    SAVE IMAGE --push ghcr.io/applied-knowledge-systems/redismod:latest
+    SAVE IMAGE --push ghcr.io/applied-knowledge-systems/redismod:bionic
     
