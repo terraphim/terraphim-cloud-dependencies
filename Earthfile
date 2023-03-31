@@ -16,7 +16,7 @@ publish-pipeline:
   PIPELINE --push
   TRIGGER push main
   TRIGGER pr main
-  BUILD +redismod
+  BUILD --allow-privileged --push +redismod
 
 all:
     BUILD \
