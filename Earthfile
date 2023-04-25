@@ -1,6 +1,6 @@
 VERSION 0.7
 PROJECT applied-knowledge-systems/terraphim-cloud-dependencies
-FROM ubuntu:20.04
+FROM ubuntu:18.04
 ARG TARGETARCH
 ARG TARGETOS
 ARG TARGETPLATFORM
@@ -22,13 +22,21 @@ all:
     BUILD \
         --platform=linux/amd64 \
         --platform=linux/aarch64 \
-        # --platform=linux/arm/v7 \
-        # --platform=linux/arm/v6 \
+        --platform=linux/arm/v7 \
+        --platform=linux/arm/v6 
+
+build-stack:
+    FROM ghcr.io/applied-knowledge-systems/rgcluster:edge
+    ENV DEBIAN_FRONTEND noninteractive
+    ENV DEBCONF_NONINTERACTIVE_SEEN true
+    RUN apt-get update && apt-get install -yqq --no-install-recommends --fix-missing git curl ca-certificates sudo gpg lsb-release
+    RUN update-ca-certificates
+    RUN curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+    RUN echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+    RUN apt-get update && apt-get install -y redis-stack-server
+    SAVE IMAGE --push ghcr.io/applied-knowledge-systems/redis-stack:bionic
 
 
-my-build:
-  RUN echo Hello world
-          
 fetch-code:
     ENV DEBIAN_FRONTEND noninteractive
     ENV DEBCONF_NONINTERACTIVE_SEEN true
@@ -43,12 +51,12 @@ fetch-code:
 
 build:
     FROM earthly/dind:ubuntu
-    RUN apt-get update && apt-get install -yqq --no-install-recommends build-essential libgomp1
+    RUN apt-get update && apt-get install -yqq --no-install-recommends build-essential
     COPY +fetch-code/RediSearch.git RediSearch
     COPY +fetch-code/RedisJSON.git RedisJSON
     COPY +fetch-code/RedisGraph.git RedisGraph
-    WITH DOCKER --pull redisfab/redis:6.2.10-x64-bionic --pull ubuntu:bionic
-         RUN cd RediSearch && make setup && make docker OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6 && cd ../RedisJSON/ && make setup && make docker OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6 && cd ../RedisGraph && make docker OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6
+    WITH DOCKER --pull redisfab/redis:6.2.10-x64-bionic --pull ghcr.io/applied-knowledge-systems/rgcluster:edge
+         RUN cd RediSearch && make setup && make docker STATIC=1 OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6 && cd ../RedisJSON/ && make setup && make docker OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6 && cd ../RedisGraph && make docker OSNICK=bionic ARTIFACTS=1 PACK=1 REDIS_VER=6.2.6
     END
     SAVE ARTIFACT /RediSearch/bin/artifacts AS LOCAL RediSearchArtifacts
     SAVE ARTIFACT /RedisJSON/bin/artifacts AS LOCAL RedisJSONArtifacts
@@ -65,20 +73,15 @@ redisai:
     SAVE ARTIFACT /var/opt/redislabs/artifacts /artifacts
 
 redismod:
-    FROM ghcr.io/applied-knowledge-systems/rgcluster:edge
-    RUN apt-get update && apt-get install -y build-essential libgomp1
+    FROM ghcr.io/applied-knowledge-systems/redis-stack:bionic
+    RUN apt-get update && apt-get install -y build-essential libgomp1 
     ENV LD_LIBRARY_PATH /usr/lib/redis/modules
     ENV REDISGEARS_MODULE_DIR /var/opt/redislabs/lib/modules
     ENV REDISGEARS_PY_DIR /var/opt/redislabs/modules/rg
-    COPY +redisai/artifacts /var/opt/redislabs/artifacts
-    COPY +redisai/modules /usr/lib/redis/modules
+    # COPY +redisai/artifacts /var/opt/redislabs/artifacts
+    # COPY +redisai/modules /usr/lib/redis/modules
     ENV LD_LIBRARY_PATH /usr/lib/redis/modules
-    COPY +build/artifacts/rejson-oss.Linux-ubuntu18.04-x86_64.2.4.2.zip /usr/lib/redis/modules/
-    COPY +build/artifacts/redisearch-oss.Linux-ubuntu18.04-x86_64.2.6.3.zip /usr/lib/redis/modules/
-    COPY +build/artifacts/redisgraph.Linux-ubuntu18.04-x86_64.2.10.4.zip /usr/lib/redis/modules/
-    RUN apt install unzip
-    RUN cd /usr/lib/redis/modules && unzip -o '*.zip'
-    COPY ./conf/redis_with_mods.conf /etc/redis/redis.conf
+    COPY ./conf/redis_with_mods_stack.conf /etc/redis/redis.conf
     COPY ./conf/redis.service /etc/systemd/system/redis.service
     WORKDIR /cluster
     SAVE IMAGE --push ghcr.io/applied-knowledge-systems/redismod:bionic
