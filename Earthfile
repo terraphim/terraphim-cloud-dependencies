@@ -34,6 +34,12 @@ build-stack:
     RUN curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
     RUN echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
     RUN apt-get update && apt-get install -y redis-stack-server
+    RUN apt remove python-pip
+    RUN apt install -y python3-pip
+    RUN apt-get install -y python3-venv
+    RUN apt-get install -y python3.8-minimal python3.8-dev python3.8-venv
+    RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10
+    RUN python3.8 -m pip install pip
     SAVE IMAGE --push ghcr.io/applied-knowledge-systems/redis-stack:bionic
 
 
